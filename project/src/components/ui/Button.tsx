@@ -21,14 +21,14 @@ const Button: React.FC<ButtonProps> = ({
   disabled,
   ...rest
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md focus:outline-none transition-colors duration-200';
-  
+  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl focus:outline-none transition-all duration-300 ease-in-out hover:transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl';
+
   const variantStyles = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50',
-    secondary: 'bg-teal-600 text-white hover:bg-teal-700 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-opacity-50',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-opacity-50',
-    outline: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50'
+    primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-4 focus:ring-accent-500/50 dark:bg-primary-700 dark:hover:bg-primary-800 animate-button-hover',
+    secondary: 'bg-accent-600 text-white hover:bg-accent-700 focus:ring-4 focus:ring-accent-500/50 dark:bg-accent-700 dark:hover:bg-accent-800 animate-button-hover',
+    success: 'bg-success-600 text-white hover:bg-success-700 focus:ring-4 focus:ring-success-500/50 dark:bg-success-700 dark:hover:bg-success-800 animate-button-hover',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-4 focus:ring-red-500/50 dark:bg-red-700 dark:hover:bg-red-800 animate-button-hover',
+    outline: 'border-2 border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 focus:ring-4 focus:ring-accent-500/50 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800'
   };
   
   const sizeStyles = {
@@ -39,7 +39,7 @@ const Button: React.FC<ButtonProps> = ({
   
   const widthStyles = fullWidth ? 'w-full' : '';
   
-  const disabledStyles = disabled || isLoading ? 'opacity-60 cursor-not-allowed' : '';
+  const disabledStyles = disabled || isLoading ? 'opacity-60 cursor-not-allowed scale-100' : '';
   
   return (
     <button

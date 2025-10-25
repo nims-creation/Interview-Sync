@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Users, Clock, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import axios from 'axios';
 
 interface User {
   id: string;
@@ -44,100 +45,65 @@ const AdminDashboard: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        
-        // Mock analytics data
-        const mockAnalytics: AnalyticsData = {
-          totalInterviews: 157,
-          upcomingInterviews: 42,
-          completedInterviews: 98,
-          cancelledInterviews: 17,
-          totalCandidates: 85,
-          totalInterviewers: 12,
-          interviewsByDay: [
-            { date: '2023-09-01', count: 5 },
-            { date: '2023-09-02', count: 3 },
-            { date: '2023-09-03', count: 0 },
-            { date: '2023-09-04', count: 7 },
-            { date: '2023-09-05', count: 4 },
-            { date: '2023-09-06', count: 6 },
-            { date: '2023-09-07', count: 2 }
-          ]
+        const token = localStorage.getItem('token');
+        const config = {
+          headers: { Authorization: `Bearer ${token}` }
         };
+
+        // Fetch interviews
+        const interviewsResponse = await axios.get('http://localhost:5000/api/interviews', config);
+        const interviews = interviewsResponse.data.data.interviews;
+
+        // Fetch users
+        const usersResponse = await axios.get('http://localhost:5000/api/auth/users', config);
+        const users = usersResponse.data.data.users;
+
+        // Calculate analytics
+        const totalInterviews = interviews.length;
+        const upcomingInterviews = interviews.filter((i: any) => i.status === 'SCHEDULED').length;
+        const completedInterviews = interviews.filter((i: any) => i.status === 'COMPLETED').length;
+        const cancelledInterviews = interviews.filter((i: any) => i.status === 'CANCELLED').length;
+        const totalCandidates = users.filter((u: any) => u.role === 'CANDIDATE').length;
+        const totalInterviewers = users.filter((u: any) => u.role === 'INTERVIEWER').length;
+
+        const analyticsData: AnalyticsData = {
+          totalInterviews,
+          upcomingInterviews,
+          completedInterviews,
+          cancelledInterviews,
+          totalCandidates,
+          totalInterviewers,
+          interviewsByDay: [] // Could be implemented later
+        };
+
+        // Format recent interviews
+        const recentInterviewsData: Interview[] = interviews.slice(0, 5).map((interview: any) => ({
+          id: interview._id,
+          date: new Date(interview.startTime),
+          candidateName: interview.candidateId?.name || 'Unknown',
+          interviewerName: interview.interviewerId?.name || 'Unknown',
+          status: interview.status.toLowerCase()
+        }));
+
+        // Format recent users
+        const recentUsersData: User[] = users.slice(0, 5).map((user: any) => ({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role.toLowerCase(),
+          interviews: interviews.filter((i: any) => 
+            i.candidateId?._id === user._id || i.interviewerId?._id === user._id
+          ).length
+        }));
         
-        // Mock recent interviews
-        const mockInterviews: Interview[] = [
-          {
-            id: '1',
-            date: new Date(Date.now() + 3600000), // 1 hour from now
-            candidateName: 'Emily Johnson',
-            interviewerName: 'Michael Smith',
-            status: 'upcoming'
-          },
-          {
-            id: '2',
-            date: new Date(Date.now() + 86400000), // tomorrow
-            candidateName: 'David Lee',
-            interviewerName: 'Sarah Wilson',
-            status: 'upcoming'
-          },
-          {
-            id: '3',
-            date: new Date(Date.now() - 3600000), // 1 hour ago
-            candidateName: 'Jessica Brown',
-            interviewerName: 'Robert Taylor',
-            status: 'completed'
-          },
-          {
-            id: '4',
-            date: new Date(Date.now() - 7200000), // 2 hours ago
-            candidateName: 'Thomas Garcia',
-            interviewerName: 'Jennifer Adams',
-            status: 'cancelled'
-          }
-        ];
-        
-        // Mock recent users
-        const mockUsers: User[] = [
-          {
-            id: '1',
-            name: 'Emma Wilson',
-            email: 'emma@example.com',
-            role: 'candidate',
-            interviews: 2
-          },
-          {
-            id: '2',
-            name: 'James Miller',
-            email: 'james@example.com',
-            role: 'candidate',
-            interviews: 1
-          },
-          {
-            id: '3',
-            name: 'Olivia Davis',
-            email: 'olivia@example.com',
-            role: 'interviewer',
-            interviews: 8
-          },
-          {
-            id: '4',
-            name: 'William Martinez',
-            email: 'william@example.com',
-            role: 'interviewer',
-            interviews: 12
-          }
-        ];
-        
-        setAnalytics(mockAnalytics);
-        setRecentInterviews(mockInterviews);
-        setRecentUsers(mockUsers);
-      } catch (error) {
+        setAnalytics(analyticsData);
+        setRecentInterviews(recentInterviewsData);
+        setRecentUsers(recentUsersData);
+      } catch (error: any) {
         addNotification({
           type: 'error',
           title: 'Error',
-          message: 'Failed to load dashboard data. Please try again.'
+          message: error.response?.data?.message || 'Failed to load dashboard data. Please try again.'
         });
       } finally {
         setIsLoading(false);

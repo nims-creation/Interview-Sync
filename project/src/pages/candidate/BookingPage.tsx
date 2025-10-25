@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button';
 import Calendar from '../../components/ui/Calendar';
 import TimeSlotPicker from '../../components/ui/TimeSlotPicker';
 import { useNotification } from '../../contexts/NotificationContext';
+import axios from 'axios';
 
 interface Interviewer {
   id: string;
@@ -27,7 +28,7 @@ const BookingPage: React.FC = () => {
   const navigate = useNavigate();
   const { addNotification } = useNotification();
   const [isLoading, setIsLoading] = useState(true);
-  const [step, setStep] = useState(1);
+  const step = 1;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [selectedInterviewerId, setSelectedInterviewerId] = useState<string | null>(null);
@@ -43,91 +44,59 @@ const BookingPage: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock interviewers data
-        const mockInterviewers: Interviewer[] = [
-          {
-            id: 'int1',
-            name: 'John Doe',
-            role: 'Senior Developer',
-            department: 'Engineering',
-            avatar: 'https://randomuser.me/api/portraits/men/32.jpg'
-          },
-          {
-            id: 'int2',
-            name: 'Jane Smith',
-            role: 'HR Manager',
-            department: 'Human Resources',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-          },
-          {
-            id: 'int3',
-            name: 'Mike Johnson',
-            role: 'Tech Lead',
-            department: 'Engineering',
-            avatar: 'https://randomuser.me/api/portraits/men/45.jpg'
-          }
-        ];
-        
-        // Generate dates for the next 10 days
-        const dates = [];
-        const today = new Date();
-        
-        for (let i = 1; i <= 10; i++) {
-          const date = new Date(today);
-          date.setDate(today.getDate() + i);
-          dates.push(date);
-        }
-        
-        // Generate random slots for the next 10 days
-        const slots: TimeSlot[] = [];
-        const times = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
-        
-        dates.forEach(date => {
-          // Each interviewer has 2-3 slots per day
-          mockInterviewers.forEach(interviewer => {
-            const numSlots = Math.floor(Math.random() * 2) + 2; // 2-3 slots
-            const shuffledTimes = [...times].sort(() => 0.5 - Math.random());
-            const interviewerTimes = shuffledTimes.slice(0, numSlots);
-            
-            interviewerTimes.forEach(startTime => {
-              const [hours, minutes] = startTime.split(':').map(Number);
-              // Each slot is 45 minutes
-              const endHour = hours + (minutes + 45 >= 60 ? 1 : 0);
-              const endMinute = (minutes + 45) % 60;
-              const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-              
-              slots.push({
-                id: `slot-${date.toISOString().split('T')[0]}-${interviewer.id}-${startTime}`,
-                interviewerId: interviewer.id,
-                date: new Date(date),
-                startTime,
-                endTime,
-                isBooked: Math.random() > 0.8 // 20% chance of being booked
-              });
+        const token = localStorage.getItem('token');
+        const config = {
+          headers: { Authorization: `Bearer ${token}` }
+        };
+
+        // Fetch available slots from API
+        const slotsResponse = await axios.get('http://localhost:5000/api/slots', config);
+        const slots: TimeSlot[] = slotsResponse.data.data.slots.map((slot: any) => ({
+          id: slot._id,
+          interviewerId: slot.interviewerId,
+          date: new Date(slot.startTime),
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          isBooked: !slot.isAvailable
+        }));
+
+        // Fetch interviewers from slots data
+        const uniqueInterviewers = new Map();
+        slots.forEach(slot => {
+          if (slot.interviewerId && !uniqueInterviewers.has(slot.interviewerId)) {
+            uniqueInterviewers.set(slot.interviewerId, {
+              id: slot.interviewerId,
+              name: 'Interviewer', // We'll need to get this from the slot population
+              role: 'interviewer',
+              department: 'Engineering'
             });
-          });
+          }
         });
         
-        setInterviewers(mockInterviewers);
+        const interviewers: Interviewer[] = Array.from(uniqueInterviewers.values());
+
+        // Generate available dates from slots
+        const dates = [...new Set(slots.map(slot => slot.date.toISOString().split('T')[0]))]
+          .map(dateStr => new Date(dateStr))
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        setInterviewers(interviewers);
         setAllSlots(slots);
         setAvailableDates(dates);
-        
+
         // Set initial available slots for the selected date
         updateAvailableSlotsForDate(selectedDate, slots, selectedInterviewerId);
-      } catch (error) {
+      } catch (error: any) {
         addNotification({
           type: 'error',
           title: 'Error',
-          message: 'Failed to load booking data. Please try again.'
+          message: error.response?.data?.message || 'Failed to load booking data. Please try again.'
         });
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     loadData();
   }, [addNotification, selectedDate]);
   
@@ -175,25 +144,46 @@ const BookingPage: React.FC = () => {
   
   const handleBookInterview = async () => {
     if (!selectedSlotId) return;
-    
+
     setIsBooking(true);
-    
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: { Authorization: `Bearer ${token}` }
+      };
+
+      const selectedSlot = availableSlots.find(slot => slot.id === selectedSlotId);
+      if (!selectedSlot) {
+        throw new Error('Selected slot not found');
+      }
+
+      const interviewer = interviewers.find(i => i.id === selectedSlot.interviewerId);
+      if (!interviewer) {
+        throw new Error('Interviewer not found');
+      }
+
+      await axios.post('http://localhost:5000/api/interviews', {
+        title: `Interview with ${interviewer.name}`,
+        description: 'Scheduled interview session',
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
+        interviewerId: selectedSlot.interviewerId,
+        slotId: selectedSlotId
+      }, config);
+
       addNotification({
         type: 'success',
         title: 'Interview Booked',
         message: 'Your interview has been scheduled successfully.'
       });
-      
+
       navigate('/candidate/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       addNotification({
         type: 'error',
         title: 'Booking Failed',
-        message: 'Failed to book the interview. Please try again.'
+        message: error.response?.data?.message || 'Failed to book the interview. Please try again.'
       });
     } finally {
       setIsBooking(false);

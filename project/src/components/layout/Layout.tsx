@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import NotificationToast from '../ui/NotificationToast';

@@ -29,83 +29,56 @@ const InterviewerDashboard: React.FC = () => {
   });
   
   useEffect(() => {
-    // Mock API call to fetch interviews
     const fetchInterviews = async () => {
       setIsLoading(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        const mockInterviews: Interview[] = [
-          {
-            id: '1',
-            date: new Date(Date.now() + 86400000), // tomorrow
-            startTime: '10:00',
-            endTime: '10:30',
-            candidateName: 'Alice Johnson',
-            candidateEmail: 'alice@example.com',
-            status: 'upcoming',
-            videoLink: 'https://meet.jit.si/InterviewSyncMeeting123'
-          },
-          {
-            id: '2',
-            date: new Date(Date.now() + 172800000), // day after tomorrow
-            startTime: '14:00',
-            endTime: '14:45',
-            candidateName: 'Bob Smith',
-            candidateEmail: 'bob@example.com',
-            status: 'upcoming',
-            videoLink: 'https://meet.jit.si/InterviewSyncMeeting456'
-          },
-          {
-            id: '3',
-            date: new Date(Date.now() + 259200000), // 3 days from now
-            startTime: '11:00',
-            endTime: '11:30',
-            candidateName: 'Charlie Brown',
-            candidateEmail: 'charlie@example.com',
-            status: 'upcoming',
-            videoLink: 'https://meet.jit.si/InterviewSyncMeeting789'
-          },
-          {
-            id: '4',
-            date: new Date(Date.now() - 86400000), // yesterday
-            startTime: '13:00',
-            endTime: '13:45',
-            candidateName: 'David Lee',
-            candidateEmail: 'david@example.com',
-            status: 'completed'
-          },
-          {
-            id: '5',
-            date: new Date(Date.now() - 172800000), // 2 days ago
-            startTime: '15:00',
-            endTime: '15:30',
-            candidateName: 'Eve Wilson',
-            candidateEmail: 'eve@example.com',
-            status: 'cancelled'
-          }
-        ];
-        
-        setInterviews(mockInterviews);
+        const token = localStorage.getItem('token');
+        const config = {
+          headers: { Authorization: `Bearer ${token}` }
+        };
+
+        const response = await axios.get('http://localhost:5000/api/interviews', config);
+        const interviewsData: Interview[] = response.data.data.interviews.map((interview: any) => ({
+          id: interview._id,
+          date: new Date(interview.startTime),
+          startTime: new Date(interview.startTime).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          }),
+          endTime: new Date(interview.endTime).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          }),
+          candidateName: interview.candidate?.name || 'Unknown',
+          candidateEmail: interview.candidate?.email || 'unknown@example.com',
+          status: interview.status.toLowerCase(),
+          videoLink: interview.videoLink
+        }));
+
+        setInterviews(interviewsData);
         
         // Calculate stats
-        const upcomingCount = mockInterviews.filter(i => i.status === 'upcoming').length;
-        const completedCount = mockInterviews.filter(i => i.status === 'completed').length;
-        const cancelledCount = mockInterviews.filter(i => i.status === 'cancelled').length;
+        const upcomingCount = interviewsData.filter(i => i.status === 'scheduled').length;
+        const completedCount = interviewsData.filter(i => i.status === 'completed').length;
+        const cancelledCount = interviewsData.filter(i => i.status === 'cancelled').length;
+        
+        // Fetch slots count
+        const slotsResponse = await axios.get('http://localhost:5000/api/slots', config);
+        const totalSlots = slotsResponse.data.data.slots.length;
         
         setStats({
           totalUpcoming: upcomingCount,
           totalCompleted: completedCount,
           totalCancelled: cancelledCount,
-          totalSlots: 15 // Mock total available slots
+          totalSlots: totalSlots
         });
-      } catch (error) {
+      } catch (error: any) {
         addNotification({ 
           type: 'error', 
           title: 'Error', 
-          message: 'Failed to load interviews. Please try again.'
+          message: error.response?.data?.message || 'Failed to load interviews. Please try again.'
         });
       } finally {
         setIsLoading(false);
@@ -115,7 +88,7 @@ const InterviewerDashboard: React.FC = () => {
     fetchInterviews();
   }, [addNotification]);
   
-  const upcomingInterviews = interviews.filter(interview => interview.status === 'upcoming');
+  const upcomingInterviews = interviews.filter(interview => interview.status === 'scheduled');
   const pastInterviews = interviews.filter(interview => interview.status === 'completed' || interview.status === 'cancelled');
   
   const formatDate = (date: Date) => {

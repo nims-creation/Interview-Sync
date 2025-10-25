@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
 
 interface User {
   id: string;
@@ -14,6 +15,7 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string, role: 'candidate' | 'interviewer') => Promise<void>;
+  googleAuth: (token: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -58,29 +60,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      // Mock login - in a real app, this would be an API call
-      if (email && password) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock user (in production this would come from a real API response)
-        const mockUser: User = {
-          id: '123',
-          email,
-          name: email.split('@')[0],
-          role: email.includes('interviewer') ? 'interviewer' : 
-                email.includes('admin') ? 'admin' : 'candidate'
-        };
-        
-        setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
-      } else {
-        throw new Error('Email and password are required');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to login');
-      throw err;
+
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
+        email,
+        password
+      });
+
+      const { user, token } = response.data.data;
+
+      setUser(user);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || 'Failed to login';
+      setError(message);
+      throw new Error(message);
     } finally {
       setIsLoading(false);
     }
@@ -90,45 +84,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      // Mock registration - in a real app, this would be an API call
-      if (email && password && name && role) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock user (in production this would come from a real API response)
-        const mockUser: User = {
-          id: '123',
-          email,
-          name,
-          role
-        };
-        
-        setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
-      } else {
-        throw new Error('All fields are required');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to register');
-      throw err;
+
+      const response = await axios.post('http://localhost:5000/api/auth/register', {
+        email,
+        password,
+        name,
+        role
+      });
+
+      const { user, token } = response.data.data;
+
+      setUser(user);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || 'Failed to register';
+      setError(message);
+      throw new Error(message);
     } finally {
       setIsLoading(false);
     }
   };
   
+  const googleAuth = async (token: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await axios.post('http://localhost:5000/api/google/google', {
+        token
+      });
+
+      const { user, token: jwtToken } = response.data.data;
+
+      setUser(user);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', jwtToken);
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || 'Google authentication failed';
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       setIsLoading(true);
-      
-      // Mock logout - in a real app, this would be an API call
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+
+      await axios.post('http://localhost:5000/api/auth/logout');
+
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
       setUser(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to logout');
+    } catch (err: any) {
+      // Logout should succeed even if API fails
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -145,6 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
     login,
     register,
+    googleAuth,
     logout,
     clearError
   };

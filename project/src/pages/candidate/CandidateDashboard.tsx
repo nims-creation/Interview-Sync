@@ -4,6 +4,7 @@ import { Calendar, Clock, Video, X, Check, Users } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import axios from 'axios';
 
 interface Interview {
   id: string;
@@ -22,74 +23,78 @@ const CandidateDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Mock API call to fetch interviews
     const fetchInterviews = async () => {
       setIsLoading(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        const mockInterviews: Interview[] = [
-          {
-            id: '1',
-            date: new Date(Date.now() + 86400000), // tomorrow
-            startTime: '10:00',
-            endTime: '10:30',
-            interviewerName: 'John Doe',
-            status: 'upcoming',
-            videoLink: 'https://meet.jit.si/InterviewSyncMeeting123'
-          },
-          {
-            id: '2',
-            date: new Date(Date.now() + 172800000), // day after tomorrow
-            startTime: '14:00',
-            endTime: '14:45',
-            interviewerName: 'Jane Smith',
-            status: 'upcoming',
-            videoLink: 'https://meet.jit.si/InterviewSyncMeeting456'
-          },
-          {
-            id: '3',
-            date: new Date(Date.now() - 86400000), // yesterday
-            startTime: '11:00',
-            endTime: '11:30',
-            interviewerName: 'Mike Johnson',
-            status: 'completed'
-          }
-        ];
-        
-        setInterviews(mockInterviews);
-      } catch (error) {
-        addNotification({ 
-          type: 'error', 
-          title: 'Error', 
-          message: 'Failed to load interviews. Please try again.'
+        const token = localStorage.getItem('token');
+        const config = {
+          headers: { Authorization: `Bearer ${token}` }
+        };
+
+        const response = await axios.get('http://localhost:5000/api/interviews', config);
+        const interviewsData: Interview[] = response.data.data.interviews.map((interview: any) => ({
+          id: interview._id,
+          date: new Date(interview.startTime),
+          startTime: new Date(interview.startTime).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          }),
+          endTime: new Date(interview.endTime).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          }),
+          interviewerName: interview.interviewer?.name || 'Unknown',
+          status: interview.status.toLowerCase(),
+          videoLink: interview.videoLink
+        }));
+
+        setInterviews(interviewsData);
+      } catch (error: any) {
+        addNotification({
+          type: 'error',
+          title: 'Error',
+          message: error.response?.data?.message || 'Failed to load interviews. Please try again.'
         });
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchInterviews();
   }, [addNotification]);
   
-  const handleCancelInterview = (interviewId: string) => {
-    // In a real app, this would make an API call to cancel the interview
-    setInterviews(interviews.map(interview => 
-      interview.id === interviewId 
-        ? { ...interview, status: 'cancelled' as const } 
-        : interview
-    ));
-    
-    addNotification({
-      type: 'success',
-      title: 'Interview Cancelled',
-      message: 'The interview has been cancelled successfully.'
-    });
+  const handleCancelInterview = async (interviewId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: { Authorization: `Bearer ${token}` }
+      };
+
+      await axios.patch(`http://localhost:5000/api/interviews/${interviewId}/cancel`, {}, config);
+
+      setInterviews(interviews.map(interview =>
+        interview.id === interviewId
+          ? { ...interview, status: 'cancelled' as const }
+          : interview
+      ));
+
+      addNotification({
+        type: 'success',
+        title: 'Interview Cancelled',
+        message: 'The interview has been cancelled successfully.'
+      });
+    } catch (error: any) {
+      addNotification({
+        type: 'error',
+        title: 'Cancellation Failed',
+        message: error.response?.data?.message || 'Failed to cancel the interview. Please try again.'
+      });
+    }
   };
   
-  const upcomingInterviews = interviews.filter(interview => interview.status === 'upcoming');
+  const upcomingInterviews = interviews.filter(interview => interview.status === 'scheduled');
   const pastInterviews = interviews.filter(interview => interview.status === 'completed' || interview.status === 'cancelled');
   
   const formatDate = (date: Date) => {
@@ -112,12 +117,12 @@ const CandidateDashboard: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Candidate Dashboard</h1>
-          <p className="text-gray-600 mt-1">Welcome back, {user?.name || 'Candidate'}</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white animate-fade-in">Candidate Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-1 animate-fade-in-delay">Welcome back, {user?.name || 'Candidate'}</p>
         </div>
         <div className="mt-4 md:mt-0">
           <Link to="/candidate/book">
-            <Button leftIcon={<Calendar className="h-5 w-5" />}>
+            <Button leftIcon={<Calendar className="h-5 w-5" />} className="hover:shadow-xl transition-shadow duration-300">
               Book New Interview
             </Button>
           </Link>
